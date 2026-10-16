@@ -27,6 +27,7 @@
   .status.err{color:var(--warn);font-weight:700}
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:14px}
   .card.alert{border-color:var(--warn);background:#fffafa}
+  .card.me{border-color:var(--accent);border-width:2px}
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .stat{text-align:center;border-radius:12px;padding:8px 4px;background:var(--ok-soft)}
   .stat .big{font-size:30px;font-weight:800;color:var(--ok);line-height:1.1}
@@ -41,13 +42,15 @@
   .bld small{font-weight:600;color:var(--muted);font-size:13px}
   .floor{margin-top:10px}
   .floor h3{margin:0 0 6px;font-size:14px;color:var(--muted);font-weight:700}
-  .rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+  .allh{margin:18px 2px 8px;font-size:15px;color:var(--muted)}
+  .rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px}
   .room{border:2px solid var(--line);background:#fffdf9;border-radius:14px;padding:10px 6px;text-align:center;
-    font:inherit;color:inherit;cursor:pointer;min-height:84px;position:relative}
+    font:inherit;color:inherit;cursor:pointer;min-height:96px;position:relative}
   .room .no{font-size:13px;color:var(--muted)}
   .room .no b{font-size:24px;color:var(--ink);margin-left:2px}
   .room .cls{font-size:14px;margin-top:2px}
   .room .st{font-size:13px;margin-top:4px;font-weight:700;color:var(--accent)}
+  .room .who{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4}
   .room.done{background:var(--ok-soft);border-color:var(--ok)}
   .room.done .st{color:var(--ok)}
   .room.checked{background:var(--ok-deep);border-color:var(--ok-dark)}
@@ -68,8 +71,12 @@
   .bsum .it small{color:var(--muted);font-size:13px}
   .bsum .it.full{background:var(--ok-soft);border-color:var(--ok)}
   .hint{color:var(--muted);font-size:14px;margin:0 2px 12px;line-height:1.6}
-  .danger{margin-top:20px;text-align:center}
-  .danger button{background:#fff;border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:10px 16px;font-size:14px;cursor:pointer}
+  .hello{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .hello b{font-size:20px}
+  .linkbtn{border:1px solid var(--line);background:#fff;border-radius:99px;padding:6px 14px;font-size:14px;cursor:pointer;color:var(--muted);font-family:inherit}
+  .me-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .me-chip{border:2px solid var(--accent);background:#fff;color:var(--accent);border-radius:99px;padding:10px 16px;
+    font-size:17px;font-weight:800;cursor:pointer;font-family:inherit}
 
   #modal{position:fixed;inset:0;background:rgba(40,30,25,.5);display:flex;align-items:flex-end;justify-content:center;z-index:20}
   #modal[hidden]{display:none}
@@ -111,7 +118,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, onSnapshot, serverTimestamp, writeBatch }
+import { getFirestore, collection, doc, setDoc, onSnapshot, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -141,6 +148,38 @@ const BUILDINGS = [
     { name: "三樓", rooms: [[35,714],[36,715],[37,716],[38,717],[39,718]] },
     { name: "二樓", rooms: [[40,709],[41,710],[42,711],[43,712]] } ]},
 ];
+
+// 人員分工：[姓名, [考場編號或 [起,迄] 範圍...]]
+const NAMES = ["素玉", "鍾綾", "筱婷", "國慧", "承勳", "子傑", "義彥", "曉曉主任"];
+const OWNER_PLAN = [   // 負責布置
+  ["素玉",     [[1,5]]],
+  ["鍾綾",     [[6,11]]],
+  ["筱婷",     [[12,17]]],
+  ["國慧",     [[19,23]]],
+  ["承勳",     [[24,29]]],
+  ["子傑",     [18, [30,33]]],
+  ["義彥",     [[34,38]]],
+  ["曉曉主任", [[39,43]]],
+];
+const REVIEWER_PLAN = [  // 負責複查
+  ["鍾綾",     [[1,5]]],
+  ["素玉",     [[6,11]]],
+  ["國慧",     [[12,17]]],
+  ["筱婷",     [[19,23]]],
+  ["子傑",     [[24,29]]],
+  ["承勳",     [18, [30,33]]],
+  ["曉曉主任", [[34,38]]],
+  ["義彥",     [[39,43]]],
+];
+function expand(plan) {
+  const m = {};
+  plan.forEach(([name, items]) => items.forEach(x => {
+    if (Array.isArray(x)) for (let i = x[0]; i <= x[1]; i++) m[i] = name; else m[x] = name;
+  }));
+  return m;
+}
+const OWNER = expand(OWNER_PLAN), REVIEWER = expand(REVIEWER_PLAN);
+
 const ALL = BUILDINGS.flatMap(b => b.floors.flatMap(f => f.rooms.map(r => r[0])));
 const TOTAL = ALL.length;
 const CLASS_OF = {}, LOC_OF = {};
@@ -152,6 +191,13 @@ const MAX_NOTE = 200;
 let rooms = {};                       // { "考場編號": {done, checked, issue} }
 let mode = location.hash === "#admin" ? "admin" : "staff";
 let modalNo = null, draft = "";
+let me = "";
+try { me = localStorage.getItem("examMe") || ""; } catch (e) {}
+if (!NAMES.includes(me)) me = "";
+function setMe(n) {
+  me = NAMES.includes(n) ? n : "";
+  try { if (me) localStorage.setItem("examMe", me); else localStorage.removeItem("examMe"); } catch (e) {}
+}
 const $ = id => document.getElementById(id);
 const view = $("view"), statusEl = $("status"), modal = $("modal");
 const R = no => rooms[String(no)] || { done: false, checked: false, issue: "" };
@@ -186,17 +232,6 @@ async function save(no, patch) {
   }
 }
 
-async function resetAll() {
-  if (!confirm("確定要把全部考場都改回「未完成」，並清掉所有複查與狀況備註嗎？")) return;
-  if (!confirm("再確認一次：這會清掉目前所有進度，無法復原。")) return;
-  try {
-    const batch = writeBatch(db);
-    ALL.forEach(no => batch.set(doc(db, COL, String(no)),
-      { done: false, checked: false, issue: "", updatedAt: serverTimestamp() }));
-    await batch.commit();
-  } catch (e) { console.error(e); alert("重設失敗：" + e.code); }
-}
-
 /* ---------- 操作視窗 ---------- */
 function openModal(no) { modalNo = no; draft = R(no).issue; renderModal(); }
 function closeModal() { modalNo = null; renderModal(); }
@@ -206,7 +241,8 @@ function renderModal() {
   const no = modalNo, r = R(no);
   modal.hidden = false;
   modal.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">
-    <h2>考場 ${no}<small>${CLASS_OF[no]} 教室 ・ ${esc(LOC_OF[no])}</small></h2>
+    <h2>考場 ${no}<small>${CLASS_OF[no]} 教室 ・ ${esc(LOC_OF[no])}</small>
+      <small>布置：${esc(OWNER[no])}　複查：${esc(REVIEWER[no])}</small></h2>
     <div class="pills">
       <span class="pill ${r.done ? "on" : ""}">${r.done ? "✓ 已完成" : "尚未完成"}</span>
       <span class="pill ${r.checked ? "on2" : ""}">${r.checked ? "✓✓ 已複查" : "尚未複查"}</span>
@@ -251,33 +287,34 @@ modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && modalNo != null) closeModal(); });
 
 /* ---------- 畫面 ---------- */
-const countOf = (list, key) => list.filter(r => R(r[0])[key]).length;
-const countIssue = list => list.filter(r => R(r[0]).issue).length;
-const allRooms = b => b.floors.flatMap(f => f.rooms);
+const countOf = (nos, key) => nos.filter(no => R(no)[key]).length;
+const countIssue = nos => nos.filter(no => R(no).issue).length;
+const roomsOf = b => b.floors.flatMap(f => f.rooms.map(r => r[0]));
+const waiting = no => (R(no).done && !R(no).checked) ? 1 : 0;
 
-function roomBtn(r) {
-  const [no, cls] = r, s = R(no);
+function roomBtn(no) {
+  const s = R(no);
   const stText = s.checked ? "✓✓ 已複查" : s.done ? "✓ 已完成，待複查" : "尚未完成";
   return `<button class="room${s.done ? " done" : ""}${s.checked ? " checked" : ""}${s.issue ? " issue" : ""}" data-no="${no}">
     ${s.issue ? `<span class="flag">⚠️</span>` : ""}
     <div class="no">考場<b>${no}</b></div>
-    <div class="cls">${cls} 教室</div>
+    <div class="cls">${CLASS_OF[no]} 教室</div>
     <div class="st">${stText}</div>
+    <div class="who">布置 ${esc(OWNER[no])}<br>複查 ${esc(REVIEWER[no])}</div>
     ${s.issue ? `<div class="note">${esc(s.issue)}</div>` : ""}</button>`;
 }
 
 function grid() {
   return BUILDINGS.map(b => {
-    const rs = allRooms(b);
+    const rs = roomsOf(b);
     return `<div class="card"><div class="bld">${b.name}<small>完成 ${countOf(rs, "done")}／複查 ${countOf(rs, "checked")}／共 ${rs.length}</small></div>` +
-      b.floors.map(f => `<div class="floor"><h3>${f.name}</h3><div class="rooms">${f.rooms.map(roomBtn).join("")}</div></div>`).join("") +
+      b.floors.map(f => `<div class="floor"><h3>${f.name}</h3><div class="rooms">${f.rooms.map(r => roomBtn(r[0])).join("")}</div></div>`).join("") +
       `</div>`;
   }).join("");
 }
 
 function statsCard() {
-  const all = ALL.map(no => [no]);
-  const n = countOf(all, "done"), k = countOf(all, "checked"), p = countIssue(all);
+  const n = countOf(ALL, "done"), k = countOf(ALL, "checked"), p = countIssue(ALL);
   return `<div class="card"><div class="stats">
       <div class="stat"><div class="big">${n}</div><div class="sub">已完成 / ${TOTAL}</div></div>
       <div class="stat c2"><div class="big">${k}</div><div class="sub">已複查 / ${TOTAL}</div></div>
@@ -286,38 +323,68 @@ function statsCard() {
     <div class="bar"><i style="width:${Math.round(n / TOTAL * 100)}%"></i><i class="b2" style="width:${Math.round(k / TOTAL * 100)}%"></i></div></div>`;
 }
 
+function pickNameCard() {
+  return `<div class="card me"><b style="font-size:18px">👋 你是哪一位？</b>
+    <p class="hint" style="margin:6px 0 0">選一下名字，下次打開就會記得，並且先顯示你負責的考場。</p>
+    <div class="me-chips">${NAMES.map(n => `<button class="me-chip" data-me="${esc(n)}">${esc(n)}</button>`).join("")}</div></div>`;
+}
+
+function mySection() {
+  const own = ALL.filter(no => OWNER[no] === me).sort((a, b) => a - b);
+  const rev = ALL.filter(no => REVIEWER[no] === me).sort((a, b) => (waiting(b) - waiting(a)) || (a - b));
+  const w = rev.filter(waiting).length;
+  return `<div class="card me">
+    <div class="hello"><span>👋 嗨，<b>${esc(me)}</b></span><button class="linkbtn" data-me="">換人</button></div>
+    <div class="floor"><h3>🛠 我負責布置：${countOf(own, "done")} / ${own.length} 完成</h3>
+      <div class="rooms">${own.map(roomBtn).join("") || "<span class='hint'>沒有</span>"}</div></div>
+    <div class="floor"><h3>🔍 我負責複查：${countOf(rev, "checked")} / ${rev.length} 已複查${w ? `，有 ${w} 間等你複查` : ""}</h3>
+      <div class="rooms">${rev.map(roomBtn).join("") || "<span class='hint'>沒有</span>"}</div></div>
+  </div>`;
+}
+
+function peopleCard() {
+  return `<div class="card"><div class="bld">各負責人進度</div><div class="bsum" style="margin-top:8px">` +
+    NAMES.map(n => {
+      const own = ALL.filter(no => OWNER[no] === n), rev = ALL.filter(no => REVIEWER[no] === n);
+      const d = countOf(own, "done"), k = countOf(rev, "checked"), w = rev.filter(waiting).length;
+      const iss = countIssue(own);
+      return `<div class="it${d === own.length && k === rev.length ? " full" : ""}"><b><span>${esc(n)}</span><span>布置 ${d}/${own.length}</span></b>
+        <div class="bar" style="height:8px;margin-top:6px"><i style="width:${Math.round(d / own.length * 100)}%"></i></div>
+        <small>複查 ${k}/${rev.length}${w ? `・等待複查 ${w} 間` : ""}${iss ? `・⚠️ ${iss} 間有狀況` : ""}</small></div>`;
+    }).join("") + `</div></div>`;
+}
+
 function render() {
   $("tab-staff").classList.toggle("on", mode === "staff");
   $("tab-admin").classList.toggle("on", mode === "admin");
 
   if (mode === "staff") {
-    view.innerHTML =
-      `<p class="hint">點一下你負責的考場，就能按「布置完成」。複查人員按「已複查」，現場有問題請按「回報狀況」。</p>` +
-      statsCard() + grid();
+    view.innerHTML = (me ? mySection() : pickNameCard()) +
+      `<p class="hint" style="margin-top:4px">點一下考場，就能按「布置完成」；複查人員按「已複查」；現場有問題請按「回報狀況」。</p>` +
+      statsCard() + `<h3 class="allh">全部考場</h3>` + grid();
   } else {
-    const pending = ALL.slice().sort((a, b) => a - b);
-    const todo = pending.filter(no => !R(no).done);
-    const unchecked = pending.filter(no => R(no).done && !R(no).checked);
-    const issues = pending.filter(no => R(no).issue);
+    const sorted = ALL.slice().sort((a, b) => a - b);
+    const todo = sorted.filter(no => !R(no).done);
+    const unchecked = sorted.filter(waiting);
+    const issues = sorted.filter(no => R(no).issue);
     view.innerHTML =
       statsCard() +
       (issues.length ? `<div class="card alert"><div class="bld" style="color:var(--warn)">⚠️ 有狀況的考場<small>${issues.length} 間</small></div><div class="issues">` +
-        issues.map(no => `<div class="iss" data-no="${no}"><b>考場${no}（${CLASS_OF[no]}）</b>　${esc(R(no).issue)}</div>`).join("") + `</div></div>` : "") +
+        issues.map(no => `<div class="iss" data-no="${no}"><b>考場${no}（${CLASS_OF[no]}）・${esc(OWNER[no])}</b>　${esc(R(no).issue)}</div>`).join("") + `</div></div>` : "") +
+      peopleCard() +
       `<div class="card"><div class="bld">各棟進度</div><div class="bsum" style="margin-top:8px">` +
-      BUILDINGS.map(b => { const rs = allRooms(b), c = countOf(rs, "done"), k = countOf(rs, "checked");
+      BUILDINGS.map(b => { const rs = roomsOf(b), c = countOf(rs, "done"), k = countOf(rs, "checked");
         return `<div class="it${k === rs.length ? " full" : ""}"><b><span>${b.name}</span><span>${c}/${rs.length}</span></b>
           <div class="bar" style="height:8px;margin-top:6px"><i style="width:${Math.round(c / rs.length * 100)}%"></i><i class="b2" style="width:${Math.round(k / rs.length * 100)}%"></i></div>
           <small>已複查 ${k}/${rs.length}</small></div>`; }).join("") +
       `</div></div>` +
       `<div class="card"><div class="bld">尚未完成<small>${todo.length} 間</small></div>` +
-      (todo.length ? `<div class="todo">${todo.map(no => `<span class="chip" data-no="${no}">考場${no}（${CLASS_OF[no]}）</span>`).join("")}</div>`
+      (todo.length ? `<div class="todo">${todo.map(no => `<span class="chip" data-no="${no}">考場${no}（${CLASS_OF[no]}）${esc(OWNER[no])}</span>`).join("")}</div>`
         : `<p style="margin:8px 0 0">🎉 全部考場都布置完成了！</p>`) + `</div>` +
       `<div class="card"><div class="bld">已完成、等待複查<small>${unchecked.length} 間</small></div>` +
-      (unchecked.length ? `<div class="todo">${unchecked.map(no => `<span class="chip g" data-no="${no}">考場${no}（${CLASS_OF[no]}）</span>`).join("")}</div>`
+      (unchecked.length ? `<div class="todo">${unchecked.map(no => `<span class="chip g" data-no="${no}">考場${no}（${CLASS_OF[no]}）${esc(REVIEWER[no])}</span>`).join("")}</div>`
         : `<p style="margin:8px 0 0;color:var(--muted)">目前沒有。</p>`) + `</div>` +
-      grid() +
-      `<div class="danger"><button id="reset">清空全部進度（新的一場考試前使用）</button></div>`;
-    const rb = $("reset"); if (rb) rb.onclick = resetAll;
+      grid();
   }
   // 正在輸入狀況說明時，不重畫視窗，避免打字被打斷
   if (modalNo != null && document.activeElement && document.activeElement.id === "note") return;
@@ -325,6 +392,8 @@ function render() {
 }
 
 view.addEventListener("click", e => {
+  const m = e.target.closest("[data-me]");
+  if (m) { setMe(m.dataset.me); render(); return; }
   const el = e.target.closest("[data-no]");
   if (el) openModal(Number(el.dataset.no));
 });
