@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>考場布置進度板</title>
+<style>
+  :root{
+    --bg:#fff8ef; --card:#ffffff; --ink:#3b2f2a; --muted:#8a7a70;
+    --line:#f0e0cf; --accent:#f08a24; --accent-soft:#ffe9d0;
+    --ok:#2e9e5b; --ok-soft:#dff5e7; --warn:#e5484d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+    -webkit-tap-highlight-color:transparent}
+  header{background:var(--accent);color:#fff;padding:14px 16px 0;position:sticky;top:0;z-index:5;
+    box-shadow:0 2px 8px rgba(0,0,0,.12)}
+  header h1{margin:0 0 10px;font-size:20px;letter-spacing:1px}
+  .tabs{display:flex;gap:6px}
+  .tab{flex:1;border:0;padding:12px 8px;font-size:16px;font-weight:700;border-radius:12px 12px 0 0;
+    background:rgba(255,255,255,.28);color:#fff;cursor:pointer}
+  .tab.on{background:var(--bg);color:var(--accent)}
+  main{max-width:900px;margin:0 auto;padding:14px 12px 80px}
+  .status{font-size:13px;color:var(--muted);margin:2px 2px 10px}
+  .status.err{color:var(--warn);font-weight:700}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:14px}
+  .sum{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .sum .big{font-size:40px;font-weight:800;color:var(--ok)}
+  .sum .sub{color:var(--muted);font-size:15px}
+  .bar{height:14px;background:var(--accent-soft);border-radius:99px;overflow:hidden;margin-top:8px}
+  .bar>i{display:block;height:100%;background:var(--ok);border-radius:99px;transition:width .4s}
+  .bld{margin:0 0 4px;font-size:17px;font-weight:800;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .bld small{font-weight:600;color:var(--muted);font-size:13px}
+  .floor{margin-top:10px}
+  .floor h3{margin:0 0 6px;font-size:14px;color:var(--muted);font-weight:700}
+  .rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+  .room{border:2px solid var(--line);background:#fffdf9;border-radius:14px;padding:10px 6px;text-align:center;
+    font:inherit;color:inherit;cursor:pointer;min-height:84px;position:relative}
+  .room .no{font-size:13px;color:var(--muted)}
+  .room .no b{font-size:24px;color:var(--ink);margin-left:2px}
+  .room .cls{font-size:14px;margin-top:2px}
+  .room .st{font-size:13px;margin-top:4px;font-weight:700;color:var(--accent)}
+  .room.done{background:var(--ok-soft);border-color:var(--ok)}
+  .room.done .st{color:var(--ok)}
+  .room.ro{cursor:default}
+  .todo{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{background:var(--accent-soft);border-radius:99px;padding:6px 12px;font-weight:700;font-size:14px}
+  .bsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+  .bsum .it{border:1px solid var(--line);border-radius:12px;padding:10px}
+  .bsum .it b{display:flex;justify-content:space-between;font-size:15px}
+  .bsum .it.full{background:var(--ok-soft);border-color:var(--ok)}
+  .hint{color:var(--muted);font-size:14px;margin:0 2px 12px;line-height:1.6}
+  .danger{margin-top:20px;text-align:center}
+  .danger button{background:#fff;border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:10px 16px;font-size:14px;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏫 考場布置進度板</h1>
+  <div class="tabs">
+    <button class="tab" id="tab-staff">布置人員</button>
+    <button class="tab" id="tab-admin">總負責人</button>
+  </div>
+</header>
+<main>
+  <div class="status" id="status">連線中…</div>
+  <div id="view"></div>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, onSnapshot, serverTimestamp, writeBatch }
+  from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBgO69052mbZ4RdGvL_GG2bcu0XD9NSN7I",
+  authDomain: "fuhe-board.firebaseapp.com",
+  projectId: "fuhe-board",
+  storageBucket: "fuhe-board.firebasestorage.app",
+  messagingSenderId: "515261096272",
+  appId: "1:515261096272:web:2292468ac45bd85f24cc55"
+};
+const db = getFirestore(initializeApp(firebaseConfig));
+const COL = "examRooms";
+
+// [考場編號, 教室號碼]
+const BUILDINGS = [
+  { name: "福和樓", floors: [
+    { name: "3、4 號樓梯側・四樓", rooms: [[18,811],[19,812],[20,804]] },
+    { name: "3、4 號樓梯側・三樓", rooms: [[15,826],[16,827],[17,719]] },
+    { name: "3、4 號樓梯側・二樓", rooms: [[1,708],[2,707],[3,828]] },
+    { name: "斜棟・外側排", rooms: [[21,805],[22,806],[23,807]] },
+    { name: "斜棟・內側排", rooms: [[12,822],[13,823],[14,824]] },
+    { name: "2、1 號樓梯側・四樓", rooms: [[24,808],[25,809],[26,810],[27,813],[28,814],[29,815]] },
+    { name: "2、1 號樓梯側・三樓", rooms: [[6,816],[7,817],[8,818],[9,819],[10,820],[11,821]] },
+    { name: "2、1 號樓梯側・二樓", rooms: [[4,829],[5,825]] } ]},
+  { name: "懿芳樓", floors: [
+    { name: "四樓", rooms: [[30,720],[31,721],[32,722],[33,723],[34,724]] },
+    { name: "三樓", rooms: [[35,714],[36,715],[37,716],[38,717],[39,718]] },
+    { name: "二樓", rooms: [[40,709],[41,710],[42,711],[43,712]] } ]},
+];
+const ALL = BUILDINGS.flatMap(b => b.floors.flatMap(f => f.rooms.map(r => r[0])));
+const TOTAL = ALL.length;
+
+let done = {};
+let mode = location.hash === "#admin" ? "admin" : "staff";
+const $ = id => document.getElementById(id);
+const view = $("view"), statusEl = $("status");
+
+function setStatus(text, err) { statusEl.textContent = text; statusEl.className = "status" + (err ? " err" : ""); }
+
+onSnapshot(collection(db, COL), snap => {
+  done = {};
+  snap.forEach(d => { done[d.id] = !!d.data().done; });
+  setStatus("✅ 已連線，畫面會自動更新");
+  render();
+}, err => {
+  console.error(err);
+  setStatus("⚠️ 連線失敗，請檢查網路（或 Firestore 規則）：" + err.code, true);
+});
+
+async function toggle(no) {
+  const cur = !!done[no];
+  if (cur && !confirm("考場 " + no + " 已標示完成，要取消完成嗎？")) return;
+  done[no] = !cur; render();           // 先更新畫面，感覺比較即時
+  try {
+    await setDoc(doc(db, COL, String(no)), { done: !cur, updatedAt: serverTimestamp() });
+  } catch (e) {
+    console.error(e);
+    done[no] = cur; render();
+    alert("儲存失敗，請確認網路後再試一次。");
+  }
+}
+
+async function resetAll() {
+  if (!confirm("確定要把全部考場都改回「未完成」嗎？")) return;
+  if (!confirm("再確認一次：這會清掉目前所有進度，無法復原。")) return;
+  try {
+    const batch = writeBatch(db);
+    ALL.forEach(no => batch.set(doc(db, COL, String(no)), { done: false, updatedAt: serverTimestamp() }));
+    await batch.commit();
+  } catch (e) { console.error(e); alert("重設失敗：" + e.code); }
+}
+
+const count = rooms => rooms.filter(r => done[r[0]]).length;
+const allRooms = b => b.floors.flatMap(f => f.rooms);
+
+function roomBtn(r, readonly) {
+  const [no, cls] = r, ok = !!done[no];
+  return `<button class="room${ok ? " done" : ""}${readonly ? " ro" : ""}" data-no="${no}" ${readonly ? "tabindex=-1" : ""}>
+    <div class="no">考場<b>${no}</b></div>
+    <div class="cls">${cls} 教室</div>
+    <div class="st">${ok ? "✓ 已完成" : "尚未完成"}</div></button>`;
+}
+
+function grid(readonly) {
+  return BUILDINGS.map(b => {
+    const rs = allRooms(b);
+    return `<div class="card"><div class="bld">${b.name}<small>${count(rs)} / ${rs.length} 完成</small></div>` +
+      b.floors.map(f => `<div class="floor"><h3>${f.name}</h3><div class="rooms">${f.rooms.map(r => roomBtn(r, readonly)).join("")}</div></div>`).join("") +
+      `</div>`;
+  }).join("");
+}
+
+function render() {
+  $("tab-staff").classList.toggle("on", mode === "staff");
+  $("tab-admin").classList.toggle("on", mode === "admin");
+  const n = ALL.filter(no => done[no]).length;
+  const pct = Math.round(n / TOTAL * 100);
+
+  if (mode === "staff") {
+    view.innerHTML =
+      `<p class="hint">找到你負責的考場，布置好後點一下按鈕就會變綠色；點錯時再點一次可以取消。</p>` +
+      `<div class="card"><div class="sum"><span class="big">${n}</span><span class="sub">/ ${TOTAL} 個考場已完成</span></div>` +
+      `<div class="bar"><i style="width:${pct}%"></i></div></div>` + grid(false);
+  } else {
+    const todo = BUILDINGS.flatMap(b => b.floors.flatMap(f => f.rooms.filter(r => !done[r[0]]).map(r => ({ no: r[0], cls: r[1] })))).sort((a, b) => a.no - b.no);
+    view.innerHTML =
+      `<div class="card"><div class="sum"><span class="big">${n}</span><span class="sub">/ ${TOTAL} 個考場已完成（${pct}%）</span></div>` +
+      `<div class="bar"><i style="width:${pct}%"></i></div></div>` +
+      `<div class="card"><div class="bld">各棟進度</div><div class="bsum" style="margin-top:8px">` +
+      BUILDINGS.map(b => { const rs = allRooms(b), c = count(rs);
+        return `<div class="it${c === rs.length ? " full" : ""}"><b><span>${b.name}</span><span>${c}/${rs.length}</span></b>
+          <div class="bar" style="height:8px"><i style="width:${Math.round(c / rs.length * 100)}%"></i></div></div>`; }).join("") +
+      `</div></div>` +
+      `<div class="card"><div class="bld">尚未完成<small>${todo.length} 間</small></div>` +
+      (todo.length ? `<div class="todo">${todo.map(t => `<span class="chip">考場${t.no}（${t.cls}）</span>`).join("")}</div>` : `<p style="margin:8px 0 0">🎉 全部考場都布置完成了！</p>`) + `</div>` +
+      grid(true) +
+      `<div class="danger"><button id="reset">清空全部進度（新的一場考試前使用）</button></div>`;
+    const rb = $("reset"); if (rb) rb.onclick = resetAll;
+  }
+}
+
+view.addEventListener("click", e => {
+  const b = e.target.closest(".room");
+  if (b && mode === "staff") toggle(Number(b.dataset.no));
+});
+function setMode(m) { mode = m; history.replaceState(null, "", m === "admin" ? "#admin" : "#staff"); render(); window.scrollTo(0, 0); }
+$("tab-staff").onclick = () => setMode("staff");
+$("tab-admin").onclick = () => setMode("admin");
+render();
+</script>
+</body>
+</html>
