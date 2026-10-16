@@ -8,7 +8,8 @@
   :root{
     --bg:#fff8ef; --card:#ffffff; --ink:#3b2f2a; --muted:#8a7a70;
     --line:#f0e0cf; --accent:#f08a24; --accent-soft:#ffe9d0;
-    --ok:#2e9e5b; --ok-soft:#dff5e7; --warn:#e5484d;
+    --ok:#2e9e5b; --ok-soft:#dff5e7; --ok-deep:#c3ecd3; --ok-dark:#1e7d46;
+    --warn:#e5484d; --warn-soft:#ffe8e8;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
@@ -25,11 +26,17 @@
   .status{font-size:13px;color:var(--muted);margin:2px 2px 10px}
   .status.err{color:var(--warn);font-weight:700}
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:14px}
-  .sum{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-  .sum .big{font-size:40px;font-weight:800;color:var(--ok)}
-  .sum .sub{color:var(--muted);font-size:15px}
-  .bar{height:14px;background:var(--accent-soft);border-radius:99px;overflow:hidden;margin-top:8px}
-  .bar>i{display:block;height:100%;background:var(--ok);border-radius:99px;transition:width .4s}
+  .card.alert{border-color:var(--warn);background:#fffafa}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat{text-align:center;border-radius:12px;padding:8px 4px;background:var(--ok-soft)}
+  .stat .big{font-size:30px;font-weight:800;color:var(--ok);line-height:1.1}
+  .stat .sub{font-size:12px;color:var(--muted)}
+  .stat.c2{background:var(--ok-deep)} .stat.c2 .big{color:var(--ok-dark)}
+  .stat.c3{background:var(--warn-soft)} .stat.c3 .big{color:var(--warn)}
+  .stat.c3.zero{background:#f6f2ee} .stat.c3.zero .big{color:var(--muted)}
+  .bar{height:12px;background:var(--accent-soft);border-radius:99px;overflow:hidden;margin-top:10px;position:relative}
+  .bar>i{display:block;height:100%;background:var(--ok);border-radius:99px;transition:width .4s;position:absolute;left:0;top:0}
+  .bar>i.b2{background:var(--ok-dark)}
   .bld{margin:0 0 4px;font-size:17px;font-weight:800;display:flex;justify-content:space-between;align-items:center;gap:8px}
   .bld small{font-weight:600;color:var(--muted);font-size:13px}
   .floor{margin-top:10px}
@@ -43,16 +50,49 @@
   .room .st{font-size:13px;margin-top:4px;font-weight:700;color:var(--accent)}
   .room.done{background:var(--ok-soft);border-color:var(--ok)}
   .room.done .st{color:var(--ok)}
-  .room.ro{cursor:default}
+  .room.checked{background:var(--ok-deep);border-color:var(--ok-dark)}
+  .room.checked .st{color:var(--ok-dark)}
+  .room.issue{border-color:var(--warn);box-shadow:0 0 0 2px var(--warn-soft)}
+  .room .flag{position:absolute;top:4px;right:6px;font-size:16px}
+  .room .note{font-size:12px;color:var(--warn);margin-top:4px;line-height:1.35;word-break:break-all;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .todo{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-  .chip{background:var(--accent-soft);border-radius:99px;padding:6px 12px;font-weight:700;font-size:14px}
-  .bsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+  .chip{background:var(--accent-soft);border-radius:99px;padding:6px 12px;font-weight:700;font-size:14px;cursor:pointer}
+  .chip.g{background:var(--ok-soft)}
+  .issues{margin-top:8px;display:grid;gap:8px}
+  .iss{border:1px solid var(--warn);background:#fff;border-radius:12px;padding:10px;cursor:pointer;font-size:15px;line-height:1.5}
+  .iss b{color:var(--warn)}
+  .bsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
   .bsum .it{border:1px solid var(--line);border-radius:12px;padding:10px}
   .bsum .it b{display:flex;justify-content:space-between;font-size:15px}
+  .bsum .it small{color:var(--muted);font-size:13px}
   .bsum .it.full{background:var(--ok-soft);border-color:var(--ok)}
   .hint{color:var(--muted);font-size:14px;margin:0 2px 12px;line-height:1.6}
   .danger{margin-top:20px;text-align:center}
   .danger button{background:#fff;border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:10px 16px;font-size:14px;cursor:pointer}
+
+  #modal{position:fixed;inset:0;background:rgba(40,30,25,.5);display:flex;align-items:flex-end;justify-content:center;z-index:20}
+  #modal[hidden]{display:none}
+  .sheet{background:#fff;width:100%;max-width:520px;border-radius:22px 22px 0 0;padding:18px 16px 26px;max-height:92vh;overflow:auto}
+  .sheet h2{margin:0;font-size:24px}
+  .sheet h2 small{display:block;font-size:14px;color:var(--muted);font-weight:600;margin-top:2px}
+  .pills{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 4px}
+  .pill{font-size:13px;font-weight:700;padding:4px 10px;border-radius:99px;background:#f3ece4;color:var(--muted)}
+  .pill.on{background:var(--ok-soft);color:var(--ok-dark)}
+  .pill.on2{background:var(--ok-deep);color:var(--ok-dark)}
+  .pill.bad{background:var(--warn-soft);color:var(--warn)}
+  .btn{width:100%;padding:15px;font-size:18px;font-weight:800;border-radius:14px;border:2px solid var(--line);
+    margin-top:10px;cursor:pointer;background:#fff;color:var(--ink);font-family:inherit}
+  .btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+  .btn.deep{background:var(--ok-dark);border-color:var(--ok-dark);color:#fff}
+  .btn.warn{background:var(--warn);border-color:var(--warn);color:#fff}
+  .btn.line{border-color:var(--muted);color:var(--muted);font-size:16px;padding:12px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .sec{margin-top:16px;padding-top:12px;border-top:1px dashed var(--line)}
+  .sec h4{margin:0 0 6px;font-size:15px}
+  .sec textarea{width:100%;min-height:76px;border:2px solid var(--line);border-radius:12px;padding:10px;font:inherit;font-size:16px;resize:vertical}
+  .sec .cnt{font-size:12px;color:var(--muted);text-align:right}
+  .sec .help{font-size:13px;color:var(--muted);margin:0 0 6px}
 </style>
 </head>
 <body>
@@ -67,6 +107,7 @@
   <div class="status" id="status">連線中…</div>
   <div id="view"></div>
 </main>
+<div id="modal" hidden></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
@@ -102,17 +143,28 @@ const BUILDINGS = [
 ];
 const ALL = BUILDINGS.flatMap(b => b.floors.flatMap(f => f.rooms.map(r => r[0])));
 const TOTAL = ALL.length;
+const CLASS_OF = {}, LOC_OF = {};
+BUILDINGS.forEach(b => b.floors.forEach(f => f.rooms.forEach(([no, cls]) => {
+  CLASS_OF[no] = cls; LOC_OF[no] = b.name + " " + f.name;
+})));
+const MAX_NOTE = 200;
 
-let done = {};
+let rooms = {};                       // { "考場編號": {done, checked, issue} }
 let mode = location.hash === "#admin" ? "admin" : "staff";
+let modalNo = null, draft = "";
 const $ = id => document.getElementById(id);
-const view = $("view"), statusEl = $("status");
+const view = $("view"), statusEl = $("status"), modal = $("modal");
+const R = no => rooms[String(no)] || { done: false, checked: false, issue: "" };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 
 function setStatus(text, err) { statusEl.textContent = text; statusEl.className = "status" + (err ? " err" : ""); }
 
 onSnapshot(collection(db, COL), snap => {
-  done = {};
-  snap.forEach(d => { done[d.id] = !!d.data().done; });
+  rooms = {};
+  snap.forEach(d => {
+    const v = d.data();
+    rooms[d.id] = { done: !!v.done, checked: !!v.checked, issue: typeof v.issue === "string" ? v.issue : "" };
+  });
   setStatus("✅ 已連線，畫面會自動更新");
   render();
 }, err => {
@@ -120,81 +172,161 @@ onSnapshot(collection(db, COL), snap => {
   setStatus("⚠️ 連線失敗，請檢查網路（或 Firestore 規則）：" + err.code, true);
 });
 
-async function toggle(no) {
-  const cur = !!done[no];
-  if (cur && !confirm("考場 " + no + " 已標示完成，要取消完成嗎？")) return;
-  done[no] = !cur; render();           // 先更新畫面，感覺比較即時
+async function save(no, patch) {
+  const key = String(no), prev = rooms[key];
+  rooms[key] = { ...R(no), ...patch };
+  render();                           // 先更新畫面，感覺比較即時
   try {
-    await setDoc(doc(db, COL, String(no)), { done: !cur, updatedAt: serverTimestamp() });
+    await setDoc(doc(db, COL, key), { ...patch, updatedAt: serverTimestamp() }, { merge: true });
   } catch (e) {
     console.error(e);
-    done[no] = cur; render();
-    alert("儲存失敗，請確認網路後再試一次。");
+    if (prev) rooms[key] = prev; else delete rooms[key];
+    render();
+    alert("儲存失敗，請確認網路後再試一次。（" + (e.code || "") + "）");
   }
 }
 
 async function resetAll() {
-  if (!confirm("確定要把全部考場都改回「未完成」嗎？")) return;
+  if (!confirm("確定要把全部考場都改回「未完成」，並清掉所有複查與狀況備註嗎？")) return;
   if (!confirm("再確認一次：這會清掉目前所有進度，無法復原。")) return;
   try {
     const batch = writeBatch(db);
-    ALL.forEach(no => batch.set(doc(db, COL, String(no)), { done: false, updatedAt: serverTimestamp() }));
+    ALL.forEach(no => batch.set(doc(db, COL, String(no)),
+      { done: false, checked: false, issue: "", updatedAt: serverTimestamp() }));
     await batch.commit();
   } catch (e) { console.error(e); alert("重設失敗：" + e.code); }
 }
 
-const count = rooms => rooms.filter(r => done[r[0]]).length;
+/* ---------- 操作視窗 ---------- */
+function openModal(no) { modalNo = no; draft = R(no).issue; renderModal(); }
+function closeModal() { modalNo = null; renderModal(); }
+
+function renderModal() {
+  if (modalNo == null) { modal.hidden = true; modal.innerHTML = ""; return; }
+  const no = modalNo, r = R(no);
+  modal.hidden = false;
+  modal.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">
+    <h2>考場 ${no}<small>${CLASS_OF[no]} 教室 ・ ${esc(LOC_OF[no])}</small></h2>
+    <div class="pills">
+      <span class="pill ${r.done ? "on" : ""}">${r.done ? "✓ 已完成" : "尚未完成"}</span>
+      <span class="pill ${r.checked ? "on2" : ""}">${r.checked ? "✓✓ 已複查" : "尚未複查"}</span>
+      ${r.issue ? `<span class="pill bad">⚠ 有狀況</span>` : ""}
+    </div>
+    ${r.done
+      ? `<button class="btn line" id="b-done">取消「完成」</button>`
+      : `<button class="btn ok" id="b-done">✓ 布置完成</button>`}
+    ${r.checked
+      ? `<button class="btn line" id="b-check">取消「已複查」</button>`
+      : `<button class="btn deep" id="b-check" ${r.done ? "" : "disabled"}>✓✓ 已複查${r.done ? "" : "（需先完成）"}</button>`}
+    <div class="sec">
+      <h4>⚠ 現場有狀況</h4>
+      <p class="help">例如：投影機壞掉、少一張桌子、冷氣不冷。總負責人會立刻看到。</p>
+      <textarea id="note" maxlength="${MAX_NOTE}" placeholder="請簡單描述狀況…">${esc(draft)}</textarea>
+      <div class="cnt" id="cnt">${draft.length} / ${MAX_NOTE}</div>
+      <button class="btn warn" id="b-issue">${r.issue ? "更新狀況說明" : "回報狀況"}</button>
+      ${r.issue ? `<button class="btn ok" id="b-clear">狀況已排除</button>` : ""}
+    </div>
+    <button class="btn line" id="b-close" style="margin-top:16px">關閉</button>
+  </div>`;
+
+  const done = $("b-done"), check = $("b-check"), issue = $("b-issue"), clear = $("b-clear"), note = $("note");
+  done.onclick = () => {
+    if (r.done) {
+      if (!confirm(r.checked ? "取消完成會一併取消「已複查」，確定嗎？" : "確定要取消「完成」嗎？")) return;
+      save(no, { done: false, checked: false });
+    } else save(no, { done: true });
+    closeModal();
+  };
+  check.onclick = () => { if (!r.done && !r.checked) return; save(no, { checked: !r.checked }); closeModal(); };
+  note.oninput = () => { draft = note.value; $("cnt").textContent = draft.length + " / " + MAX_NOTE; };
+  issue.onclick = () => {
+    const t = note.value.trim().slice(0, MAX_NOTE);
+    if (!t) { alert("請先寫一下是什麼狀況喔。"); return; }
+    save(no, { issue: t }); closeModal();
+  };
+  if (clear) clear.onclick = () => { save(no, { issue: "" }); closeModal(); };
+  $("b-close").onclick = closeModal;
+}
+modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && modalNo != null) closeModal(); });
+
+/* ---------- 畫面 ---------- */
+const countOf = (list, key) => list.filter(r => R(r[0])[key]).length;
+const countIssue = list => list.filter(r => R(r[0]).issue).length;
 const allRooms = b => b.floors.flatMap(f => f.rooms);
 
-function roomBtn(r, readonly) {
-  const [no, cls] = r, ok = !!done[no];
-  return `<button class="room${ok ? " done" : ""}${readonly ? " ro" : ""}" data-no="${no}" ${readonly ? "tabindex=-1" : ""}>
+function roomBtn(r) {
+  const [no, cls] = r, s = R(no);
+  const stText = s.checked ? "✓✓ 已複查" : s.done ? "✓ 已完成，待複查" : "尚未完成";
+  return `<button class="room${s.done ? " done" : ""}${s.checked ? " checked" : ""}${s.issue ? " issue" : ""}" data-no="${no}">
+    ${s.issue ? `<span class="flag">⚠️</span>` : ""}
     <div class="no">考場<b>${no}</b></div>
     <div class="cls">${cls} 教室</div>
-    <div class="st">${ok ? "✓ 已完成" : "尚未完成"}</div></button>`;
+    <div class="st">${stText}</div>
+    ${s.issue ? `<div class="note">${esc(s.issue)}</div>` : ""}</button>`;
 }
 
-function grid(readonly) {
+function grid() {
   return BUILDINGS.map(b => {
     const rs = allRooms(b);
-    return `<div class="card"><div class="bld">${b.name}<small>${count(rs)} / ${rs.length} 完成</small></div>` +
-      b.floors.map(f => `<div class="floor"><h3>${f.name}</h3><div class="rooms">${f.rooms.map(r => roomBtn(r, readonly)).join("")}</div></div>`).join("") +
+    return `<div class="card"><div class="bld">${b.name}<small>完成 ${countOf(rs, "done")}／複查 ${countOf(rs, "checked")}／共 ${rs.length}</small></div>` +
+      b.floors.map(f => `<div class="floor"><h3>${f.name}</h3><div class="rooms">${f.rooms.map(roomBtn).join("")}</div></div>`).join("") +
       `</div>`;
   }).join("");
+}
+
+function statsCard() {
+  const all = ALL.map(no => [no]);
+  const n = countOf(all, "done"), k = countOf(all, "checked"), p = countIssue(all);
+  return `<div class="card"><div class="stats">
+      <div class="stat"><div class="big">${n}</div><div class="sub">已完成 / ${TOTAL}</div></div>
+      <div class="stat c2"><div class="big">${k}</div><div class="sub">已複查 / ${TOTAL}</div></div>
+      <div class="stat c3${p ? "" : " zero"}"><div class="big">${p}</div><div class="sub">有狀況</div></div>
+    </div>
+    <div class="bar"><i style="width:${Math.round(n / TOTAL * 100)}%"></i><i class="b2" style="width:${Math.round(k / TOTAL * 100)}%"></i></div></div>`;
 }
 
 function render() {
   $("tab-staff").classList.toggle("on", mode === "staff");
   $("tab-admin").classList.toggle("on", mode === "admin");
-  const n = ALL.filter(no => done[no]).length;
-  const pct = Math.round(n / TOTAL * 100);
 
   if (mode === "staff") {
     view.innerHTML =
-      `<p class="hint">找到你負責的考場，布置好後點一下按鈕就會變綠色；點錯時再點一次可以取消。</p>` +
-      `<div class="card"><div class="sum"><span class="big">${n}</span><span class="sub">/ ${TOTAL} 個考場已完成</span></div>` +
-      `<div class="bar"><i style="width:${pct}%"></i></div></div>` + grid(false);
+      `<p class="hint">點一下你負責的考場，就能按「布置完成」。複查人員按「已複查」，現場有問題請按「回報狀況」。</p>` +
+      statsCard() + grid();
   } else {
-    const todo = BUILDINGS.flatMap(b => b.floors.flatMap(f => f.rooms.filter(r => !done[r[0]]).map(r => ({ no: r[0], cls: r[1] })))).sort((a, b) => a.no - b.no);
+    const pending = ALL.slice().sort((a, b) => a - b);
+    const todo = pending.filter(no => !R(no).done);
+    const unchecked = pending.filter(no => R(no).done && !R(no).checked);
+    const issues = pending.filter(no => R(no).issue);
     view.innerHTML =
-      `<div class="card"><div class="sum"><span class="big">${n}</span><span class="sub">/ ${TOTAL} 個考場已完成（${pct}%）</span></div>` +
-      `<div class="bar"><i style="width:${pct}%"></i></div></div>` +
+      statsCard() +
+      (issues.length ? `<div class="card alert"><div class="bld" style="color:var(--warn)">⚠️ 有狀況的考場<small>${issues.length} 間</small></div><div class="issues">` +
+        issues.map(no => `<div class="iss" data-no="${no}"><b>考場${no}（${CLASS_OF[no]}）</b>　${esc(R(no).issue)}</div>`).join("") + `</div></div>` : "") +
       `<div class="card"><div class="bld">各棟進度</div><div class="bsum" style="margin-top:8px">` +
-      BUILDINGS.map(b => { const rs = allRooms(b), c = count(rs);
-        return `<div class="it${c === rs.length ? " full" : ""}"><b><span>${b.name}</span><span>${c}/${rs.length}</span></b>
-          <div class="bar" style="height:8px"><i style="width:${Math.round(c / rs.length * 100)}%"></i></div></div>`; }).join("") +
+      BUILDINGS.map(b => { const rs = allRooms(b), c = countOf(rs, "done"), k = countOf(rs, "checked");
+        return `<div class="it${k === rs.length ? " full" : ""}"><b><span>${b.name}</span><span>${c}/${rs.length}</span></b>
+          <div class="bar" style="height:8px;margin-top:6px"><i style="width:${Math.round(c / rs.length * 100)}%"></i><i class="b2" style="width:${Math.round(k / rs.length * 100)}%"></i></div>
+          <small>已複查 ${k}/${rs.length}</small></div>`; }).join("") +
       `</div></div>` +
       `<div class="card"><div class="bld">尚未完成<small>${todo.length} 間</small></div>` +
-      (todo.length ? `<div class="todo">${todo.map(t => `<span class="chip">考場${t.no}（${t.cls}）</span>`).join("")}</div>` : `<p style="margin:8px 0 0">🎉 全部考場都布置完成了！</p>`) + `</div>` +
-      grid(true) +
+      (todo.length ? `<div class="todo">${todo.map(no => `<span class="chip" data-no="${no}">考場${no}（${CLASS_OF[no]}）</span>`).join("")}</div>`
+        : `<p style="margin:8px 0 0">🎉 全部考場都布置完成了！</p>`) + `</div>` +
+      `<div class="card"><div class="bld">已完成、等待複查<small>${unchecked.length} 間</small></div>` +
+      (unchecked.length ? `<div class="todo">${unchecked.map(no => `<span class="chip g" data-no="${no}">考場${no}（${CLASS_OF[no]}）</span>`).join("")}</div>`
+        : `<p style="margin:8px 0 0;color:var(--muted)">目前沒有。</p>`) + `</div>` +
+      grid() +
       `<div class="danger"><button id="reset">清空全部進度（新的一場考試前使用）</button></div>`;
     const rb = $("reset"); if (rb) rb.onclick = resetAll;
   }
+  // 正在輸入狀況說明時，不重畫視窗，避免打字被打斷
+  if (modalNo != null && document.activeElement && document.activeElement.id === "note") return;
+  renderModal();
 }
 
 view.addEventListener("click", e => {
-  const b = e.target.closest(".room");
-  if (b && mode === "staff") toggle(Number(b.dataset.no));
+  const el = e.target.closest("[data-no]");
+  if (el) openModal(Number(el.dataset.no));
 });
 function setMode(m) { mode = m; history.replaceState(null, "", m === "admin" ? "#admin" : "#staff"); render(); window.scrollTo(0, 0); }
 $("tab-staff").onclick = () => setMode("staff");
